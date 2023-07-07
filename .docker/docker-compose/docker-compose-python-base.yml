@@ -1,0 +1,15 @@
+version: '3.7'
+
+services:
+  python-base:
+    image: ${DOCKER_REGISTRY?}/${DOCKER_NAMESPACE?}/python-base-${ENV?}:${TAG?}
+    build:
+      # pass the full codebase to docker for building the image
+      context: ../../
+      dockerfile: ./.docker/images/python-base/Dockerfile
+      args:
+        - ALPINE_VERSION=${ALPINE_VERSION?}
+        - COMPOSER_VERSION=${COMPOSER_VERSION?}
+        - ENV=${ENV?}
+        - TARGET_PYTHON_VERSION=${PYTHON_VERSION?}
+      target: ${ENV?}
