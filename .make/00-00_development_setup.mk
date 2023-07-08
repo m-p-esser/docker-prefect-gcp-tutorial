@@ -8,6 +8,10 @@ dev-init: ## Run this command once after cloning the repo to initialize everythi
 	"$(MAKE)" -s dev-verify-tools
 	@printf	"$(GREEN)Verifying 'docker compose' version$(NO_COLOR)\n"
 	"$(MAKE)" -s dev-verify-compose-version
+# @printf	"$(GREEN)Installing poetry and creating pyproject.toml$(NO_COLOR)\n"
+# "$(MAKE)" -s create-poetry-env
+# @printf	"$(GREEN)Setup Python env and installing package dependencies$(NO_COLOR)\n"
+# "$(MAKE)" -s setup-python-env 
 # @printf	"$(GREEN)Initializing user id$(NO_COLOR)\n"
 # "$(MAKE)" -s dev-init-user-id
 # @printf	"$(GREEN)Copying the secret gpg key of the tutorial to './secret.gpg'$(NO_COLOR)\n"
@@ -32,8 +36,13 @@ dev-init: ## Run this command once after cloning the repo to initialize everythi
 	@echo " - run 'make qa'      to run the application QA tools" 
 	@echo "" 
 
+# .PHONY: create-poetry-env
+# create-poetry-env: ## Setup poetry environment from existing folder
+# 	pip install poetry
+# 	rm pyproject.toml
+# 	poetry init -n
 
-# .PHONY: activate
+# .PHONY: activate-poetry
 # activate: ## Activate Poetry Shell
 # 	poetry shell
 
@@ -44,7 +53,7 @@ dev-init: ## Run this command once after cloning the repo to initialize everythi
 
 # .PHONY: setup-python-env 
 # setup-python-env: ## Setup Python environment using poetry
-# 	"$(MAKE)" activate
+# 	"$(MAKE)" activate-poetry
 # 	"$(MAKE)" add-python-dependencies
 
 .PHONY: dev-verify-compose-version
