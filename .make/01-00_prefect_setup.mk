@@ -1,5 +1,7 @@
 ##@ [Prefect: Setup]
 
+# CONSIDER USE $ENV TARGET IN BLOCK NAME, USE PREFECT CLI
+
 .PHONY:
 setup-prefect: ## Setup Prefect
 	"$(MAKE)" 
