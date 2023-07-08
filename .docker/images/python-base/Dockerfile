@@ -7,10 +7,22 @@ ARG PYTHON_VERSION
 FROM composer:${COMPOSER_VERSION} as composer
 FROM alpine:${ALPINE_VERSION} as base
 
-RUN apk add --update --no-cache \
+# install git-secret
+# @see https://git-secret.io/installation#alpine
+ADD https://gitsecret.jfrog.io/artifactory/api/security/keypair/public/repositories/git-secret-apk /etc/apk/keys/git-secret-apk.rsa.pub
+
+# @see https://www.pascallandau.com//blog/git-secret-encrypt-repository-docker/
+RUN echo "https://gitsecret.jfrog.io/artifactory/git-secret-apk/all/main" >> /etc/apk/repositories  && \
+   apk add --update --no-cache \
    bash \
+   git \
+   git-secret \
+   # required for git-secret
+   gawk \
    gnupg \
-   make
+   make \
+   strace \
+   sudo
 
 ##### This Layer installs Python and all dependencies #####
 
