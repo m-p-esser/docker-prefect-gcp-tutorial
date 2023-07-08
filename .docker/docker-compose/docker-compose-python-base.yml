@@ -11,5 +11,6 @@ services:
         - ALPINE_VERSION=${ALPINE_VERSION?}
         - COMPOSER_VERSION=${COMPOSER_VERSION?}
         - ENV=${ENV?}
-        - TARGET_PYTHON_VERSION=${PYTHON_VERSION?}
-      target: ${ENV?}
+        - PYTHON_VERSION=${PYTHON_VERSION?}
+        - POETRY_VERSION=${POETRY_VERSION?}
+      # target: ${ENV?}
