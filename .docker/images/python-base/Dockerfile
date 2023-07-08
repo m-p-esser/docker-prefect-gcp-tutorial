@@ -19,23 +19,16 @@ FROM python:${PYTHON_VERSION}
 
 ARG POETRY_VERSION
 RUN pip install poetry==${POETRY_VERSION}
-RUN poetry new test
-
-ARG ENV
-
 # RUN python -m venv /venv
+RUN rm -f pyproject.toml
+RUN poetry init -n
+RUN poetry add black flake8 pre-commit ipykernel -G dev
+RUN poetry add prefect pandas
+
+
 
 # COPY pyproject.toml poetry.lock ./
 # RUN poetry export -f requirements.txt | /venv/bin/pip install -r /dev/stdin
 
 # COPY . .
 # RUN poetry build && /venv/bin/pip install dist/*.whl
-
-# RUN pip install poetry
-# RUN poetry new docker-prefect-gcp-tutorial 
-# RUN poetry add black flake8 pre-commit ipykernel -G dev
-# RUN poetry add prefect pandas
-
-# RUN poetry shell
-
-# WORKDIR /src
