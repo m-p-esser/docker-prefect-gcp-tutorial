@@ -63,7 +63,7 @@ endif
 include .make/variables.env
 
 # Include the current environment settings
-include .make/.env
+-include .make/.env
 
 # Include the Deployment environment settings
 -include .make/deployment-settings.env
