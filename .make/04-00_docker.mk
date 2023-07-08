@@ -1,15 +1,28 @@
 # Enable buildkit for docker and docker-compose by default for every environment.
 # For specific environments (e.g. MacBook with Apple Silicon M1 CPU) it should be turned off to work stable
 # - this can be done in the .make/.env file
+
+########### Variables #############
+
 COMPOSE_DOCKER_CLI_BUILD?=1
 DOCKER_BUILDKIT?=1
 
 export COMPOSE_DOCKER_CLI_BUILD
 export DOCKER_BUILDKIT
 
-# Container names
-## must match the names used in the docker-composer.yml files
+# In which container should the execution happen?
+EXECUTE_IN_ANY_CONTAINER?=
+EXECUTE_IN_WORKER_CONTAINER?=
+EXECUTE_IN_APPLICATION_CONTAINER?=
+
+DOCKER_SERVICE_NAME?=
+
+########### Container names #############
+
+## must match the names used in the docker-composer.yml and variables.env files
 DOCKER_SERVICE_NAME_PYTHON_BASE=python-base
+DOCKER_SERVICE_NAME_PREFECT_WORKER=prefect-worker
+DOCKER_SERVICE_NAME_METABASE_APPLICATION=metabase-application
 
 # FYI:
 # Naming convention for images is $(DOCKER_REGISTRY)/$(DOCKER_NAMESPACE)/$(DOCKER_SERVICE_NAME)-$(ENV)
@@ -19,19 +32,22 @@ DOCKER_SERVICE_NAME_PYTHON_BASE=python-base
 # $(DOCKER_SERVICE_NAME)------------------^      ^        nginx
 # $(ENV)-----------------------------------------^        local
 
+########### List of docker related directories #############
+
 DOCKER_DIR:=./.docker
 DOCKER_ENV_FILE:=$(DOCKER_DIR)/.env
 DOCKER_COMPOSE_DIR:=$(DOCKER_DIR)/docker-compose
-# DOCKER_COMPOSE_FILE_LOCAL_CI_PROD:=$(DOCKER_COMPOSE_DIR)/docker-compose.local.ci.prod.yml
-# DOCKER_COMPOSE_FILE_LOCAL_PROD:=$(DOCKER_COMPOSE_DIR)/docker-compose.local.prod.yml
-# DOCKER_COMPOSE_FILE_LOCAL:=$(DOCKER_COMPOSE_DIR)/docker-compose.local.yml
-# DOCKER_COMPOSE_FILE_CI:=$(DOCKER_COMPOSE_DIR)/docker-compose.ci.yml
-# DOCKER_COMPOSE_FILE_PROD:=$(DOCKER_COMPOSE_DIR)/docker-compose.prod.yml
+DOCKER_COMPOSE_FILE_LOCAL_CI_PROD:=$(DOCKER_COMPOSE_DIR)/docker-compose.local.ci.prod.yml
+DOCKER_COMPOSE_FILE_LOCAL_PROD:=$(DOCKER_COMPOSE_DIR)/docker-compose.local.prod.yml
+DOCKER_COMPOSE_FILE_LOCAL:=$(DOCKER_COMPOSE_DIR)/docker-compose.local.yml
+DOCKER_COMPOSE_FILE_CI:=$(DOCKER_COMPOSE_DIR)/docker-compose.ci.yml
+DOCKER_COMPOSE_FILE_PROD:=$(DOCKER_COMPOSE_DIR)/docker-compose.prod.yml
 DOCKER_COMPOSE_FILE_PYTHON_BASE:=$(DOCKER_COMPOSE_DIR)/docker-compose-python-base.yml
 DOCKER_COMPOSE_PROJECT_NAME:=awesome-docker_$(ENV)
 
+########### Combines Docker Compose file references in a list #############
 
-# we need to "assemble" the correct combination of docker-compose.yml config files
+# we need to "assemble" the correct combination of docker-compose.yml config files. This helps to run the correct Docker Compose files depending on which environment we are on
 DOCKER_COMPOSE_FILES=
 ifeq ($(ENV),prod)
 	DOCKER_COMPOSE_FILES:=-f $(DOCKER_COMPOSE_FILE_LOCAL_CI_PROD) -f $(DOCKER_COMPOSE_FILE_LOCAL_PROD) -f $(DOCKER_COMPOSE_FILE_PROD)
@@ -41,9 +57,9 @@ else ifeq ($(ENV),local)
 	DOCKER_COMPOSE_FILES:=-f $(DOCKER_COMPOSE_FILE_LOCAL_CI_PROD) -f $(DOCKER_COMPOSE_FILE_LOCAL_PROD) -f $(DOCKER_COMPOSE_FILE_LOCAL)
 endif
 
+########### Prepare Basic Docker Compose commands using Env variables #############
 
-# we need a couple of environment variables for docker-compose so we define a make-variable that we can
-# then reference later in the Makefile without having to repeat all the environment variables
+# we need a couple of environment variables for docker-compose so we define a make-variable that we can then reference later in the Makefile without having to repeat all the environment variables
 DOCKER_COMPOSE_COMMAND:= \
  ENV=$(ENV) \
  TAG=$(TAG) \
@@ -51,10 +67,39 @@ DOCKER_COMPOSE_COMMAND:= \
  DOCKER_NAMESPACE=$(DOCKER_NAMESPACE) \
  docker compose -p $(DOCKER_COMPOSE_PROJECT_NAME) --env-file $(DOCKER_ENV_FILE)
 
+########### Prepare Basic Docker Compose commands #############
+
 DOCKER_COMPOSE:=$(DOCKER_COMPOSE_COMMAND) $(DOCKER_COMPOSE_FILES)
 DOCKER_COMPOSE_PYTHON_BASE:=$(DOCKER_COMPOSE_COMMAND) -f $(DOCKER_COMPOSE_FILE_PYTHON_BASE)
 
-DOCKER_SERVICE_NAME?=
+########### Allows to execute a Make command (target) in a Docker Container #############
+
+# we can pass EXECUTE_IN_CONTAINER=true to a make invocation in order to execute the target in a docker container.
+# Caution: this only works if the command in the target is prefixed with a $(EXECUTE_IN_*_CONTAINER) variable.
+# If EXECUTE_IN_CONTAINER is NOT defined, we will check if make is ALREADY executed in a docker container.
+# We still need a way to FORCE the execution in a container, e.g. for Gitlab CI, because the Gitlab
+# Runner is executed as a docker container BUT we want to execute commands in OUR OWN docker containers!
+EXECUTE_IN_CONTAINER?=
+
+ifndef EXECUTE_IN_CONTAINER
+# check if 'make' is executed in a docker container, see https://stackoverflow.com/a/25518538/413531
+# `wildcard $file` checks if $file exists, see https://www.gnu.org/software/make/manual/html_node/Wildcard-Function.html
+# i.e. if the result is "empty" then $file does NOT exist => we are NOT in a container
+	ifeq ("$(wildcard /.dockerenv)","")
+		EXECUTE_IN_CONTAINER=true
+	endif
+endif
+
+# General
+ifeq ($(EXECUTE_IN_CONTAINER),true)
+	EXECUTE_IN_ANY_CONTAINER:=$(DOCKER_COMPOSE) exec $(DOCKER_COMPOSE_EXEC_OPTIONS) $(DOCKER_SERVICE_NAME)
+
+# Metabase
+	EXECUTE_IN_APPLICATION_CONTAINER:=$(DOCKER_COMPOSE) exec $(DOCKER_COMPOSE_EXEC_OPTIONS) $(DOCKER_SERVICE_NAME_METABASE)
+
+# Prefect
+	EXECUTE_IN_WORKER_CONTAINER:=$(DOCKER_COMPOSE) exec $(DOCKER_COMPOSE_EXEC_OPTIONS) $(DOCKER_SERVICE_NAME_PREFECT_WORKER)
+endif
 
 ##@ [Docker]
 
@@ -79,13 +124,13 @@ validate-docker-variables: # .docker/.env compose-secrets.env
 .docker/.env:
 	@cp $(DOCKER_ENV_FILE).example $(DOCKER_ENV_FILE)
 
-# compose-secrets.env:
-# 	@echo "# This file only exists because docker compose cannot run 'build' otherwise," > ./compose-secrets.env
-# 	@echo "# as it is referenced as an 'env_file' in the docker compose config file" >> ./compose-secrets.env
-# 	@echo "# for the 'prod' environment. On 'prod' it will contain the necessary ENV variables," >> ./compose-secrets.env
-# 	@echo "# but on all other environments this 'placeholder' file is created." >> ./compose-secrets.env
-# 	@echo "# The file is generated automatically via 'make' if a docker compose target is executed" >> ./compose-secrets.env
-# 	@echo "# @see https://github.com/docker/compose/issues/1973#issuecomment-1148257736" >> ./compose-secrets.env
+compose-secrets.env:
+	@echo "# This file only exists because docker compose cannot run 'build' otherwise," > ./compose-secrets.env
+	@echo "# as it is referenced as an 'env_file' in the docker compose config file" >> ./compose-secrets.env
+	@echo "# for the 'prod' environment. On 'prod' it will contain the necessary ENV variables," >> ./compose-secrets.env
+	@echo "# but on all other environments this 'placeholder' file is created." >> ./compose-secrets.env
+	@echo "# The file is generated automatically via 'make' if a docker compose target is executed" >> ./compose-secrets.env
+	@echo "# @see https://github.com/docker/compose/issues/1973#issuecomment-1148257736" >> ./compose-secrets.env
 
 .PHONY:docker-build-image
 docker-build-image: validate-docker-variables ## Build all docker images OR a specific image by providing the service name via: make docker-build DOCKER_SERVICE_NAME=<service>
